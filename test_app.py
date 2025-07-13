@@ -1,7 +1,7 @@
 import pytest
 import os
 import json
-from moto import mock_dynamodb2
+from moto import mock_dynamodb
 import boto3
 from unittest.mock import patch
 from chalice.app import WebsocketDisconnectedError, BadRequestError
@@ -14,7 +14,7 @@ def setup_dynamodb():
     os.environ['APP_AWS_REGION'] = 'ap-northeast-1'
     os.environ['TABLE_NAME'] = TABLE_NAME
 
-    with mock_dynamodb2():
+    with mock_dynamodb():
         dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
         table = dynamodb.create_table(
             TableName=TABLE_NAME,
