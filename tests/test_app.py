@@ -1,7 +1,10 @@
-import pytest
 import json
+import pytest
 from unittest.mock import patch, MagicMock
 from chalice.app import WebsocketDisconnectedError
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app import app, register_user, broadcast_result, unregister_user
 
 TABLE_NAME = "bpl_room_dev"
