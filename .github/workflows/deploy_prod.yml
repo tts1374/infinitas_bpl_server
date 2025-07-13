@@ -28,7 +28,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Unit Tests
-        run: pytest tests --disable-warnings
+        run: pytest --disable-warnings
 
       - name: Configure AWS Credentials (PROD)
         uses: aws-actions/configure-aws-credentials@v4
