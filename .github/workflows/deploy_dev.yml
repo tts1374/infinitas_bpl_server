@@ -12,6 +12,10 @@ jobs:
     env:
       APP_AWS_REGION: ap-northeast-1
       TABLE_NAME: bpl_room_dev
+    
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout Repository
