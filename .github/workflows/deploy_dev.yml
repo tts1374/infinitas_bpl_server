@@ -29,7 +29,7 @@ jobs:
           pip install pytest moto
 
       - name: Run Unit Tests
-        run: pytest test_app.py
+        run: pytest tests/ --disable-warnings
 
       - name: Configure AWS Credentials (DEV)
         uses: aws-actions/configure-aws-credentials@v4
