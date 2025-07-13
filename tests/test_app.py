@@ -1,28 +1,24 @@
-import json
 import pytest
+import json
 from unittest.mock import patch, MagicMock
 from chalice.app import WebsocketDisconnectedError
-import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app import app, register_user, broadcast_result, unregister_user
 
 TABLE_NAME = "bpl_room_dev"
 
 # イベント生成ヘルパー
 def make_event(connection_id, event_type, params=None, body=None):
-    event = {
+    return {
         "requestContext": {
             "connectionId": connection_id,
+            "eventType": event_type,
             "domainName": "dummy.execute-api.ap-northeast-1.amazonaws.com",
             "stage": "dev",
-            "apiId": "dummyApiId",
-            "eventType": event_type
+            "apiId": "dummyApiId"
         },
         "queryStringParameters": params or {},
         "body": body
     }
-    return event
 
 
 @pytest.mark.usefixtures("setup_dynamodb")
@@ -56,9 +52,9 @@ def test_register_user_over_capacity_2():
     assert response['statusCode'] == 500
     assert "定員オーバー" in response['body']
 
+
 @pytest.mark.usefixtures("setup_dynamodb")
 def test_broadcast_result():
-    # 事前登録
     connect_event = make_event("test-conn-2", "CONNECT", params={"roomId": "3333-4444", "mode": "2"})
     register_user(connect_event, context={})
 
@@ -84,7 +80,6 @@ def test_unregister_user():
     register_user(connect_event, context={})
 
     disconnect_event = make_event("test-conn-3", "DISCONNECT")
-
     response = unregister_user(disconnect_event, context={})
     assert response['statusCode'] == 200
 
@@ -106,10 +101,14 @@ def test_register_user_invalid_room_id():
 
 
 @pytest.mark.usefixtures("setup_dynamodb")
-def test_register_user_dynamodb_error(monkeypatch):
+def test_register_user_dynamodb_error():
     event = make_event("test-conn-dynamo-error", "CONNECT", params={"roomId": "1234-5678", "mode": "1"})
 
-    with patch('app.table.put_item', side_effect=Exception("DynamoDB error")):
+    with patch('app.get_table') as mock_get_table:
+        mock_table = MagicMock()
+        mock_table.put_item.side_effect = Exception("DynamoDB error")
+        mock_get_table.return_value = mock_table
+
         response = register_user(event, context={})
 
     assert response['statusCode'] == 500
@@ -117,8 +116,61 @@ def test_register_user_dynamodb_error(monkeypatch):
 
 
 @pytest.mark.usefixtures("setup_dynamodb")
+def test_register_user_query_exception():
+    event = make_event("test-conn-query-error", "CONNECT", params={"roomId": "1234-5678", "mode": "1"})
+
+    with patch('app.get_table') as mock_get_table:
+        mock_table = MagicMock()
+        mock_table.query.side_effect = Exception("DynamoDB query error")
+        mock_get_table.return_value = mock_table
+
+        response = register_user(event, context={})
+
+    assert response['statusCode'] == 500
+    assert "ルームの接続に失敗しました" in response['body']
+
+
+@pytest.mark.usefixtures("setup_dynamodb")
+def test_broadcast_result_query_exception():
+    message_body = json.dumps({
+        "roomId": "3333-4444",
+        "mode": 2,
+        "userId": "user123",
+        "name": "テストユーザー",
+        "result": "<result>test</result>"
+    })
+
+    message_event = make_event("test-conn-query-error", "MESSAGE", body=message_body)
+
+    with patch('app.get_table') as mock_get_table:
+        mock_table = MagicMock()
+        mock_table.query.side_effect = Exception("DynamoDB query error")
+        mock_get_table.return_value = mock_table
+
+        response = broadcast_result(message_event, context={})
+
+    assert response['statusCode'] == 500
+    print(response['body'])
+    assert "送信処理が失敗しました" in response['body']
+
+
+@pytest.mark.usefixtures("setup_dynamodb")
+def test_unregister_user_delete_exception():
+    disconnect_event = make_event("test-conn-del-error", "DISCONNECT")
+
+    with patch('app.get_table') as mock_get_table:
+        mock_table = MagicMock()
+        mock_table.delete_item.side_effect = Exception("DynamoDB delete error")
+        mock_get_table.return_value = mock_table
+
+        response = unregister_user(disconnect_event, context={})
+
+    assert response['statusCode'] == 500
+    assert "ルームの接続に失敗しました" in response['body']
+
+
+@pytest.mark.usefixtures("setup_dynamodb")
 def test_broadcast_result_disconnected():
-    # 事前登録
     connect_event = make_event("test-conn-disconnect", "CONNECT", params={"roomId": "9999-8888", "mode": "2"})
     register_user(connect_event, context={})
 
@@ -137,52 +189,9 @@ def test_broadcast_result_disconnected():
         response = broadcast_result(message_event, context={})
         assert response['statusCode'] == 200
 
-    # DynamoDBから削除確認
+    # DynamoDBから削除されているか確認
     import boto3
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
     table = dynamodb.Table(TABLE_NAME)
     result = table.get_item(Key={'connection_id': "test-conn-disconnect"})
     assert 'Item' not in result
-
-@pytest.mark.usefixtures("setup_dynamodb")
-def test_register_user_query_exception():
-    event = make_event("test-conn-err-query", "CONNECT", params={"roomId": "1234-5678", "mode": "1"})
-
-    with patch('app.table.query', side_effect=Exception("query failed")):
-        response = register_user(event, context={})
-
-    assert response['statusCode'] == 500
-    assert "ルームの接続に失敗しました" in response['body']
-
-
-@pytest.mark.usefixtures("setup_dynamodb")
-def test_broadcast_result_query_exception():
-    message_body = json.dumps({
-        "roomId": "3333-4444",
-        "mode": 2,
-        "userId": "user123",
-        "name": "エラー確認",
-        "result": "<result>test</result>"
-    })
-    message_event = make_event("test-conn-query-fail", "MESSAGE", body=message_body)
-
-    with patch.object(app, 'websocket_api') as mock_ws_api:
-        mock_ws_api.send = MagicMock(side_effect=Exception("query failed"))
-        response = broadcast_result(message_event, context={})
-
-    assert response['statusCode'] == 500
-    assert "接続先が見つかりませんでした" in response['body']
-
-
-@pytest.mark.usefixtures("setup_dynamodb")
-def test_unregister_user_delete_exception():
-    connect_event = make_event("test-conn-delete-ex", "CONNECT", params={"roomId": "0000-0000", "mode": "1"})
-    register_user(connect_event, context={})
-
-    disconnect_event = make_event("test-conn-delete-ex", "DISCONNECT")
-
-    with patch('app.table.delete_item', side_effect=Exception("delete failed")):
-        response = unregister_user(disconnect_event, context={})
-
-    assert response['statusCode'] == 500
-    assert "ルームの接続に失敗しました" in response['body']

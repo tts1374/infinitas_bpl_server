@@ -8,15 +8,14 @@ from boto3.dynamodb.conditions import Key
 
 app = Chalice(app_name='infinitas_bpl_server')
 app.experimental_feature_flags.update(['WEBSOCKETS'])
-
-dynamodb = boto3.resource('dynamodb', region_name=os.environ['APP_AWS_REGION'])
-table_name = os.environ['TABLE_NAME']
-table = dynamodb.Table(table_name)
-
 app.websocket_api.session = boto3.session.Session(region_name=os.environ['APP_AWS_REGION'])
 
 # 複合GSI名（room_id + mode）
 ROOM_MODE_INDEX = 'room_mode-index'
+
+def get_table():
+    dynamodb = boto3.resource('dynamodb', region_name=os.environ['APP_AWS_REGION'])
+    return dynamodb.Table(os.environ['TABLE_NAME'])
 
 # ---------------------------
 # WebSocket接続開始（ユーザ登録API）
@@ -45,7 +44,7 @@ def register_user(event):
         mode_int = int(mode)
 
         # 定員チェック（複合GSI使用）
-        response = table.query(
+        response = get_table().query(
             IndexName=ROOM_MODE_INDEX,
             KeyConditionExpression=Key('room_id').eq(room_id) & Key('mode').eq(mode_int),
             ProjectionExpression="connection_id"
@@ -69,7 +68,7 @@ def register_user(event):
 
         connection_id = event.connection_id
 
-        table.put_item(
+        get_table().put_item(
             Item={
                 'connection_id': connection_id,
                 'room_id': room_id,
@@ -105,7 +104,7 @@ def broadcast_result(event):
 
         mode_int = int(mode)
 
-        response = table.query(
+        response = get_table().query(
             IndexName=ROOM_MODE_INDEX,
             KeyConditionExpression=Key('room_id').eq(room_id) & Key('mode').eq(mode_int),
             ProjectionExpression="connection_id"
@@ -130,7 +129,7 @@ def broadcast_result(event):
                 app.log.info(f"送信成功: to connection_id={conn_id}")
             except WebsocketDisconnectedError:
                 app.log.info(f"切断検出: connection_id={conn_id} を削除")
-                table.delete_item(Key={'connection_id': conn_id})
+                get_table().delete_item(Key={'connection_id': conn_id})
             except Exception as e:
                 app.log.error(f"送信エラー: {str(e)}")
 
@@ -138,7 +137,7 @@ def broadcast_result(event):
 
     except Exception as e:
         app.log.error(f"送信処理失敗: {traceback.format_exc()}")
-        return {'statusCode': 500, 'body': traceback.format_exc()}
+        return {'statusCode': 500, 'body': '接続できませんでした：送信処理が失敗しました'}
 
 # ---------------------------
 # WebSocket切断時（ユーザ削除API）
@@ -147,7 +146,7 @@ def broadcast_result(event):
 def unregister_user(event):
     try:
         connection_id = event.connection_id
-        table.delete_item(Key={'connection_id': connection_id})
+        get_table().delete_item(Key={'connection_id': connection_id})
         app.log.info(f"切断成功: connection_id={connection_id}")
         return {'statusCode': 200, 'body': ''}
 
