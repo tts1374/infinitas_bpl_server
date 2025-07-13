@@ -53,7 +53,10 @@
     },
     {
       "Effect": "Allow",
-      "Action": "iam:PassRole",
+      "Action": [
+        "iam:GetRole",
+        "iam:PassRole"
+      ],
       "Resource": "arn:aws:iam::219930336567:role/infinitas_bpl_server-dev"
     }
   ]
