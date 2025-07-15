@@ -10,6 +10,8 @@ app = Chalice(app_name='infinitas_bpl_server')
 app.experimental_feature_flags.update(['WEBSOCKETS'])
 app.websocket_api.session = boto3.session.Session(region_name=os.environ['APP_AWS_REGION'])
 
+# 接続制限
+MAX_CONNECTIONS = int(os.environ['MAX_CONNECTIONS'])
 # 複合GSI名（room_id + mode）
 ROOM_MODE_INDEX = 'room_mode-index'
 
@@ -41,6 +43,10 @@ def register_user(event):
                 'body': '接続できませんでした：ルームIDの形式が違います'
             }
 
+        # 現在の接続数確認
+        active_connections = get_table().scan(Select="COUNT")["Count"]
+        if active_connections >= MAX_CONNECTIONS:
+            return {"statusCode": 403, "body": "Too many connections"}
         mode_int = int(mode)
 
         # 定員チェック（複合GSI使用）
