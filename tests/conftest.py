@@ -12,7 +12,7 @@ TABLE_NAME = "bpl_room_dev"
 def setup_dynamodb():
     os.environ['APP_AWS_REGION'] = 'ap-northeast-1'
     os.environ['TABLE_NAME'] = TABLE_NAME
-    os.environ['MAX_CONNECTIONS'] = 10
+    os.environ['MAX_CONNECTIONS'] = "10"
 
     with mock_aws():
         dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
