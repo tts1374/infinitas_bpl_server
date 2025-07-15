@@ -12,6 +12,7 @@ jobs:
     env:
       APP_AWS_REGION: ap-northeast-1
       TABLE_NAME: bpl_room_dev
+      MAX_CONNECTIONS: 10
     
     permissions:
       id-token: write
