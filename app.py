@@ -29,7 +29,7 @@ def register_user(event):
         room_id = params.get('roomId')
         mode = params.get('mode')
 
-        if not mode or mode not in ['1', '2']:
+        if not mode or mode not in ['1', '2', '3', '4']:
             app.log.error("接続エラー: モード形式不正")
             return {
                 'statusCode': 500,
