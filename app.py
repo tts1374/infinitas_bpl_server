@@ -36,7 +36,7 @@ def register_user(event):
                 'body': '接続できませんでした：モードの形式が違います'
             }
 
-        if not room_id or not re.match(r'^\d{4}-\d{4}$', room_id):
+        if not room_id or not re.match(r'^[a-zA-Z0-9_-]{4,32}$', room_id):
             app.log.error("接続エラー: ルームID形式不正")
             return {
                 'statusCode': 500,
