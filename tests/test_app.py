@@ -94,7 +94,7 @@ def test_register_user_invalid_mode():
 
 @pytest.mark.usefixtures("setup_dynamodb")
 def test_register_user_invalid_room_id():
-    event = make_event("test-conn-invalid-room", "CONNECT", params={"roomId": "abcd-efgh", "mode": "1"})
+    event = make_event("test-conn-invalid-room", "CONNECT", params={"roomId": "あいうえお", "mode": "1"})
     response = register_user(event, context={})
     assert response['statusCode'] == 500
     assert "ルームIDの形式が違います" in response['body']
