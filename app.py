@@ -102,6 +102,8 @@ def broadcast_result(event):
         room_id = body.get('roomId')
         user_id = body.get('userId')
         name = body.get('name')
+        result_token = body.get('resultToken') or ""
+        operation = body.get('operation') or "register"
         result = body.get('result')
         mode = body.get('mode')
 
@@ -126,6 +128,8 @@ def broadcast_result(event):
         message = json.dumps({
             'userId': user_id,
             'name': name,
+            'operation': operation,
+            'resultToken': result_token,
             'result': result
         })
 
